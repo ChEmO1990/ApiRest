@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
 |
 */
 
-Route::resource('buyer', 'Buyer\BuyerController', ['only' =>['index', 'show']]);
+Route::resource('buyers', 'Buyer\BuyerController', ['only' =>['index', 'show']]);
 Route::resource('categories', 'Category\CategoryController', ['except' =>['create', 'edit']]);
 Route::resource('products', 'Product\ProductController', ['only' =>['index', 'show']]);
 Route::resource('transactions', 'Transaction\TransactionController', ['only' =>['index', 'show']]);
