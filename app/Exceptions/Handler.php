@@ -4,10 +4,14 @@ namespace App\Exceptions;
 
 use Exception;
 use App\Traits\ApiResponser;
+use Illuminate\Database\QueryException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
 
 class Handler extends ExceptionHandler
 {
@@ -53,12 +57,44 @@ class Handler extends ExceptionHandler
             return $this->convertValidationExceptionToResponse($exception, $request);
         }
 
-        if( $exception instanceof ModelNotFoundException) {
+        if($exception instanceof ModelNotFoundException) {
             $modelo = strtolower(class_basename($exception->getModel()));
             return $this->errorResponse("No existe ninguna instancia de {$modelo} con ese id especificado", 404);
         }
 
-        return parent::render($request, $exception);
+        if($exception instanceof AuthenticationException) {
+            return $this->unauthenticated($request, $exception);
+        }
+
+        if($exception instanceof AuthorizationException) {
+            return $this->errorResponse('No posee permisos para ejecutar esta accion', 403);
+        }
+
+        if($exception instanceof NotFoundHttpException) {
+            return $this->errorResponse('No se encontro la url especificada', 404);
+        }
+
+        if($exception instanceof MethodNotAllowedHttpException) {
+            return $this->errorResponse('El metodo especificado en la peticion no es valido', 405);
+        }
+
+        if($exception instanceof HttpException) {
+            return $this->errorResponse($exception->getMessage(), $exception->getStatusCode());
+        }
+
+        if($exception instanceof QueryException) {
+            $codigo = $exception->errorInfo[1];
+
+            if($codigo == 1451) {
+                return $this->errorResponse('No se puede eliminar de forma permanente el recurso porque esta relacionado con algun otro', 409);
+            }
+        }
+
+        if(config('app.debug')) {
+            return parent::render($request, $exception);
+        }
+
+        return $this->errorResponse('Falla inesperada. Intente luego', 500);
     }
 
     /**
@@ -70,11 +106,7 @@ class Handler extends ExceptionHandler
      */
     protected function unauthenticated($request, AuthenticationException $exception)
     {
-        if ($request->expectsJson()) {
-            return response()->json(['error' => 'Unauthenticated.'], 401);
-        }
-
-        return redirect()->guest(route('login'));
+        return $this->errorResponse('No autenticado', 401);
     }
 
     /**
